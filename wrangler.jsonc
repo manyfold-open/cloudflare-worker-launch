@@ -25,7 +25,7 @@
     {
       "binding": "DB",
       "database_name": "cloudflare-worker-launch-db",
-      "database_id": "00000000-0000-4000-8000-000000000000"
+      "database_id": "77cc0def-ad26-4339-813f-3bd6f0a6af92"
     }
   ],
   "vars": {
