@@ -99,12 +99,11 @@ token lacks. Add it and paste the token again — the wizard lists the full set 
 | `src/app/components/Wizard.tsx` | The five steps |
 | `src/app/components/Console.tsx` | The development console once setup is done |
 | `skills/cf-starter-dev/` | The harness skill installed onto every provisioned agent |
-| `SPEC.md` | Product spec, including the verified platform API surface and what is still open |
 
 ## Status
 
 Draft. The setup chain has been verified end to end against Manyfold staging — account
 binding, agent creation with zero keys, skill install, A2A exposure and token minting,
-GitHub linking, and a live streamed turn. What has not been exercised in a real browser is
-the GitHub App install pop-up round trip. See `SPEC.md` for the open questions and the
-milestones.
+GitHub linking, and a live streamed turn. What has not been exercised end to end is the
+GitHub App install round trip: the install URL opens correctly, but nobody has yet come
+back from GitHub with a freshly granted repository.
