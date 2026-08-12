@@ -68,7 +68,7 @@ import {
 } from './setup';
 import { getConversation, handleChatTurn, resetConversation } from './chat';
 
-const SERVICE = 'manyfold-launch';
+const SERVICE = 'cloudflare-worker-launch';
 
 const TEMPLATE_REPO_URL = 'https://github.com/manyfold-open/cloudflare-worker-starter';
 const DEPLOY_BUTTON_URL = `https://deploy.workers.cloudflare.com/?url=${TEMPLATE_REPO_URL}`;

@@ -1,5 +1,5 @@
 {
-  "name": "manyfold-launch",
+  "name": "cloudflare-worker-launch",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -34,7 +34,7 @@
     "wrangler": "^4.120.1"
   },
   "cloudflare": {
-    "label": "Manyfold Launch",
+    "label": "Cloudflare Worker Launch",
     "products": [
       "Workers",
       "D1"

@@ -8,7 +8,7 @@
 // Keep `main`, `assets` and the `DB` binding valid — the app reads all three.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "manyfold-launch",
+  "name": "cloudflare-worker-launch",
   "main": "./src/worker/index.ts",
   "compatibility_date": "2026-08-01",
   "observability": {
@@ -24,7 +24,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "manyfold-launch-db",
+      "database_name": "cloudflare-worker-launch-db",
       "database_id": "00000000-0000-4000-8000-000000000000"
     }
   ],

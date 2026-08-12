@@ -33,7 +33,7 @@ const checks = [
         throw new Error('requiredScopes is empty — the wizard would ask for nothing');
       }
       // A first visit must hand back a session, or nothing downstream can own a project.
-      if (!/(^|;\s*)mfl_session=/.test(response.headers.get('set-cookie') ?? '')) {
+      if (!/(^|;\s*)cwl_session=/.test(response.headers.get('set-cookie') ?? '')) {
         throw new Error('no session cookie on a fresh visit');
       }
     },

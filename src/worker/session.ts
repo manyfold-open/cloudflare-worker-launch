@@ -16,7 +16,7 @@ import { now, randomId, setSetting } from './db';
 import { seal, unseal } from './crypto';
 import { ManyfoldClient, ManyfoldError, manyfoldEnvironment, toHttpError } from './manyfold';
 
-const COOKIE_NAME = 'mfl_session';
+const COOKIE_NAME = 'cwl_session';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface SessionRow {

@@ -1,6 +1,6 @@
 # Working on this repository
 
-Rules for anyone — human or AI agent — working on Manyfold Launch. This app is derived from
+Rules for anyone — human or AI agent — working on Cloudflare Worker Launch. This app is derived from
 [cloudflare-worker-starter](https://github.com/manyfold-open/cloudflare-worker-starter) and
 keeps its deployment model and its worker-side invariants; what follows adds the ones that
 only apply because this app is multi-tenant and holds other people's credentials.

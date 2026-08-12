@@ -40,12 +40,12 @@ import {
  * skill to exist in the account's library first — see `installHarnessSkill`.
  */
 const HARNESS_SKILL_URL =
-  'https://github.com/manyfold-open/manyfold-launch/tree/main/skills/cf-starter-dev';
+  'https://github.com/manyfold-open/cloudflare-worker-launch/tree/main/skills/cf-starter-dev';
 
 /** Conversation credentials are rotated rather than renewed; 90 days is one product cycle. */
 const CALLER_TOKEN_DAYS = 90;
 
-const CALLER_NAME = 'Manyfold Launch';
+const CALLER_NAME = 'Cloudflare Worker Launch';
 
 /** Preference order when the account offers several models on the same provider. */
 const MODEL_PREFERENCE: Record<Framework, string[]> = {

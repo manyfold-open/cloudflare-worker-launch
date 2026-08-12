@@ -89,7 +89,7 @@ export default function App() {
             ✳
           </span>
           <div>
-            <h1>Manyfold Launch</h1>
+            <h1>Cloudflare Worker Launch</h1>
             <p className="muted">Ship a Cloudflare app, and an agent that keeps building it.</p>
           </div>
         </div>

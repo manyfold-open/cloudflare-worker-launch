@@ -1,8 +1,8 @@
-# Manyfold Launch
+# Cloudflare Worker Launch
 
 Ship a Cloudflare app — and an AI agent that keeps building it.
 
-Manyfold Launch is a five-step wizard. At the end of it you own a deployed Cloudflare
+Cloudflare Worker Launch is a five-step wizard. At the end of it you own a deployed Cloudflare
 Worker, a GitHub repository, and a [Manyfold](https://manyfold.ai) agent that can clone
 that repository, change it, push, and let Cloudflare deploy the result. From then on you
 develop by talking to it.

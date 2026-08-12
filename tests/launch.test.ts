@@ -105,7 +105,7 @@ describe('session cookie', () => {
   });
 
   it('reads its own cookie back out of a crowded header', () => {
-    expect(readSessionCookie('other=1; mfl_session=ses_9; another=2')).toBe('ses_9');
+    expect(readSessionCookie('other=1; cwl_session=ses_9; another=2')).toBe('ses_9');
     expect(readSessionCookie('other=1')).toBeNull();
     expect(readSessionCookie(undefined)).toBeNull();
   });
