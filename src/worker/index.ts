@@ -37,7 +37,7 @@ import { HttpError, type Env } from './types';
 import { ensureSchema } from './db';
 import { ConfigError } from './crypto';
 import { A2AError, fetchTimeout, safeErrorText, validateA2AUrl } from './a2a';
-import { ManyfoldError, toHttpError, type Framework } from './manyfold';
+import { ManyfoldError, manyfoldEnvironment, toHttpError, type Framework } from './manyfold';
 import {
   connectAccount,
   createSession,
@@ -202,6 +202,7 @@ app.get('/api/state', async (c) => {
     hasManagementToken: tenant.bound ? (await managementClient(c.env, tenant.userId)) !== null : false,
     projects: projects.map(toView),
     requiredScopes: REQUIRED_SCOPES,
+    ...manyfoldEnvironment(c.env.MANYFOLD_API_BASE_URL),
     templateRepoUrl: TEMPLATE_REPO_URL,
     deployButtonUrl: DEPLOY_BUTTON_URL,
   };

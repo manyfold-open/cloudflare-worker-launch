@@ -14,7 +14,7 @@ import type { Env } from './types';
 import { HttpError } from './types';
 import { now, randomId, setSetting } from './db';
 import { seal, unseal } from './crypto';
-import { ManyfoldClient, ManyfoldError, toHttpError } from './manyfold';
+import { ManyfoldClient, ManyfoldError, manyfoldEnvironment, toHttpError } from './manyfold';
 
 const COOKIE_NAME = 'mfl_session';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -129,10 +129,11 @@ export async function connectAccount(
     agents = await client.listAgents();
   } catch (error) {
     if (error instanceof ManyfoldError && error.isAuth) {
+      const { apiHost } = manyfoldEnvironment(env.MANYFOLD_API_BASE_URL);
       throw new HttpError(
         401,
         'token_rejected',
-        `Manyfold rejected that token — ${error.message}`,
+        `${apiHost} rejected that token — ${error.message}. Tokens belong to one Manyfold environment: a token created anywhere other than ${apiHost} will not work here.`,
       );
     }
     throw toHttpError(error, 'Could not reach Manyfold');

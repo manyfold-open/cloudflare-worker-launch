@@ -64,6 +64,18 @@ generate-a-key-into-D1 fallback is not good enough here:
 npx wrangler secret put CONFIG_ENCRYPTION_KEY
 ```
 
+## Troubleshooting
+
+**"api token not found" when you paste your token.** Almost always the wrong environment,
+not a bad paste: Manyfold tokens belong to exactly one host, and a staging token sent to
+production (or the reverse) comes back with that flat message. The authorize step names the
+host this deployment talks to and links to the token page that matches it — create the token
+there. To point a local checkout somewhere else, set `MANYFOLD_API_BASE_URL` in `.dev.vars`;
+without a `.dev.vars` the default from `wrangler.jsonc` (production) applies.
+
+**"token missing scope: one of […]"** is the platform telling you precisely which scope the
+token lacks. Add it and paste the token again — the wizard lists the full set it needs.
+
 ## Layout
 
 | Path | What lives there |

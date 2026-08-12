@@ -114,7 +114,12 @@ function DeployStep(props: {
 
 /* ───────── step 2: authorize ───────── */
 
-function AuthStep(props: { scopes: string[]; onDone: () => Promise<void> }) {
+function AuthStep(props: {
+  scopes: string[];
+  apiHost: string;
+  tokenPageUrl: string;
+  onDone: () => Promise<void>;
+}) {
   const [token, setToken] = useState('');
   const { busy, error, run } = useAsyncAction();
 
@@ -122,9 +127,24 @@ function AuthStep(props: { scopes: string[]; onDone: () => Promise<void> }) {
     <section className="panel">
       <h2>2 · Authorize your Manyfold account</h2>
       <p className="muted">
-        Create an API token in Manyfold (Settings → API tokens) with exactly these scopes,
-        then paste it below. We use it only to set the agent up, and you can have us forget
-        it the moment setup is done.
+        Create an API token with exactly these scopes and paste it below. We use it only to
+        set the agent up, and you can have us forget it the moment setup is done.
+      </p>
+
+      {/* Named up front because tokens are per-environment: pasting a token from a
+          different Manyfold environment fails with a flat "api token not found", which
+          reads like a bad paste rather than the wrong host. */}
+      <p className="hint">
+        This app talks to <code>{props.apiHost}</code>
+        {props.tokenPageUrl && (
+          <>
+            {' — create the token at '}
+            <a href={props.tokenPageUrl} target="_blank" rel="noreferrer">
+              {props.tokenPageUrl.replace(/^https:\/\//, '')} ↗
+            </a>
+          </>
+        )}
+        . A token from any other Manyfold environment will be rejected.
       </p>
 
       <ul className="scopes">
@@ -471,6 +491,8 @@ export default function Wizard(props: {
   project: ProjectView;
   connected: boolean;
   scopes: string[];
+  apiHost: string;
+  tokenPageUrl: string;
   deployButtonUrl: string;
   refresh: () => Promise<void>;
   onProject: (project: ProjectView) => void;
@@ -503,7 +525,14 @@ export default function Wizard(props: {
           onDone={props.onProject}
         />
       )}
-      {effective === 'auth' && <AuthStep scopes={props.scopes} onDone={props.refresh} />}
+      {effective === 'auth' && (
+        <AuthStep
+          scopes={props.scopes}
+          apiHost={props.apiHost}
+          tokenPageUrl={props.tokenPageUrl}
+          onDone={props.refresh}
+        />
+      )}
       {effective === 'agent' && <AgentStep project={props.project} onDone={props.onProject} />}
       {effective === 'github' && <GithubStep project={props.project} onDone={props.onProject} />}
       {effective === 'bootstrap' && (

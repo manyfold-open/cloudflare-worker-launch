@@ -300,6 +300,30 @@ export class ManyfoldClient {
   }
 }
 
+/**
+ * Which Manyfold environment this deployment talks to, in the two forms the UI needs.
+ *
+ * Worth surfacing rather than keeping internal: API tokens are per-environment, and a
+ * staging token sent to production comes back as a flat "api token not found" — an error
+ * that reads like a bad paste when it is really a wrong host. Showing the host in the
+ * wizard, and naming it in that error, makes the mismatch self-evident.
+ */
+export function manyfoldEnvironment(baseUrl?: string): { apiHost: string; tokenPageUrl: string } {
+  const raw = (baseUrl ?? DEFAULT_BASE_URL).trim().replace(/\/+$/, '');
+  let apiHost: string;
+  try {
+    apiHost = new URL(raw).host;
+  } catch {
+    return { apiHost: raw, tokenPageUrl: '' };
+  }
+  // The web console paired with this API host: api.manyfold.ai → manyfold.ai,
+  // api-staging.manyfold.ai → app-staging.manyfold.ai.
+  const webHost = apiHost.startsWith('api-')
+    ? apiHost.replace(/^api-([a-z0-9]+)\./, 'app-$1.')
+    : apiHost.replace(/^api\./, '');
+  return { apiHost, tokenPageUrl: `https://${webHost}/settings/api-tokens` };
+}
+
 /** Maps a platform error onto the HTTP status this app should answer with. */
 export function toHttpError(error: unknown, context: string): HttpError {
   if (error instanceof ManyfoldError) {

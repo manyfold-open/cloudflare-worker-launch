@@ -129,6 +129,8 @@ export default function App() {
           project={active}
           connected={state.connected}
           scopes={state.requiredScopes}
+          apiHost={state.apiHost}
+          tokenPageUrl={state.tokenPageUrl}
           deployButtonUrl={state.deployButtonUrl}
           refresh={refreshState}
           onProject={onProject}

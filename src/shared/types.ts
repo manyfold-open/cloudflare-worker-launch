@@ -74,6 +74,10 @@ export interface AppState {
   projects: ProjectView[];
   /** The scopes the wizard asks for, so the UI and the server cannot drift apart. */
   requiredScopes: string[];
+  /** The Manyfold environment this deployment talks to — tokens are not portable across them. */
+  apiHost: string;
+  /** Where to create a token for that specific environment. */
+  tokenPageUrl: string;
   /** Where the user creates that token. */
   templateRepoUrl: string;
   deployButtonUrl: string;

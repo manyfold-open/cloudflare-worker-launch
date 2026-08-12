@@ -7,7 +7,13 @@
 import { describe, expect, it } from 'vitest';
 import { asSetupState, toView, type ProjectRow } from '../src/worker/projects';
 import { bootstrapPrompt, chooseModel } from '../src/worker/setup';
-import { FRAMEWORK_PROTOCOL, pickProvider, providerModels, type ModelProvider } from '../src/worker/manyfold';
+import {
+  FRAMEWORK_PROTOCOL,
+  manyfoldEnvironment,
+  pickProvider,
+  providerModels,
+  type ModelProvider,
+} from '../src/worker/manyfold';
 import {
   readSessionCookie,
   requireBoundTenant,
@@ -173,5 +179,25 @@ describe('chooseModel', () => {
 
   it('returns null when the provider advertises nothing', () => {
     expect(chooseModel('codex', [])).toBeNull();
+  });
+});
+
+describe('manyfoldEnvironment', () => {
+  it('pairs each API host with the web console that owns its tokens', () => {
+    expect(manyfoldEnvironment('https://api.manyfold.ai')).toEqual({
+      apiHost: 'api.manyfold.ai',
+      tokenPageUrl: 'https://manyfold.ai/settings/api-tokens',
+    });
+    expect(manyfoldEnvironment('https://api-staging.manyfold.ai')).toEqual({
+      apiHost: 'api-staging.manyfold.ai',
+      tokenPageUrl: 'https://app-staging.manyfold.ai/settings/api-tokens',
+    });
+  });
+
+  it('defaults to production and tolerates a trailing slash', () => {
+    expect(manyfoldEnvironment(undefined).apiHost).toBe('api.manyfold.ai');
+    expect(manyfoldEnvironment('https://api-staging.manyfold.ai/').apiHost).toBe(
+      'api-staging.manyfold.ai',
+    );
   });
 });
