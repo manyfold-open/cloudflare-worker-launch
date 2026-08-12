@@ -1,0 +1,15 @@
+# Local development variables. Copy to .dev.vars (git-ignored) and adjust.
+#
+# Point at staging while developing: creating agents and minting tokens on production
+# would touch real accounts.
+MANYFOLD_API_BASE_URL=https://api-staging.manyfold.ai
+
+# "production" turns on https-only and no-private-IP validation for agent and app URLs.
+# Leave it unset (or "development") locally so http://localhost targets are accepted.
+ENVIRONMENT=development
+
+# REQUIRED in any deployment that more than one person uses: this app stores other
+# people's Manyfold account tokens, so the encryption key must not live in the database.
+# Must be at least 32 characters.
+#   npx wrangler secret put CONFIG_ENCRYPTION_KEY
+CONFIG_ENCRYPTION_KEY=local-dev-only-key-that-is-long-enough-32

@@ -1,0 +1,22 @@
+# Checks only — this workflow never deploys and stores no Cloudflare credentials.
+# Deployment happens on Cloudflare's side: Workers Builds watches the repo and runs
+# `npm run build` + `npx wrangler deploy` on every push to main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test

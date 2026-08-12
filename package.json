@@ -1,0 +1,48 @@
+{
+  "name": "manyfold-launch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Launch a Cloudflare app and an AI agent that develops it: deploy the starter, provision a Manyfold agent, hand it your repo, then build by chatting.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "check": "tsc -b && vite build && wrangler deploy --dry-run",
+    "test": "vitest run",
+    "deploy": "wrangler deploy",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "hono": "^4.13.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.51.2",
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.120.1"
+  },
+  "cloudflare": {
+    "label": "Manyfold Launch",
+    "products": [
+      "Workers",
+      "D1"
+    ],
+    "bindings": {
+      "DB": {
+        "description": "Stores launch projects, tenant sessions, and chat history. Account and agent credentials are encrypted at rest."
+      }
+    }
+  }
+}
