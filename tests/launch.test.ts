@@ -21,6 +21,11 @@ import {
   sessionCookie,
 } from '../src/worker/session';
 import { HttpError } from '../src/worker/types';
+import {
+  cloudflareWorkerUrl,
+  githubRepoUrl,
+  manyfoldAgentUrl,
+} from '../src/shared/links';
 
 const row = (overrides: Partial<ProjectRow> = {}): ProjectRow => ({
   id: 'prj_1',
@@ -208,5 +213,36 @@ describe('manyfoldEnvironment web base', () => {
     expect(manyfoldEnvironment('https://api-staging.manyfold.ai').webBaseUrl).toBe(
       'https://app-staging.manyfold.ai',
     );
+  });
+});
+
+describe('deep links', () => {
+  it('builds a repo URL only from something that looks like owner/repo', () => {
+    expect(githubRepoUrl('octocat/my-app')).toBe('https://github.com/octocat/my-app');
+    expect(githubRepoUrl(null)).toBeNull();
+    // Anything else would end up in an href, so it is refused rather than guessed at.
+    expect(githubRepoUrl('not a repo')).toBeNull();
+    expect(githubRepoUrl('evil.com/a/../b')).toBeNull();
+  });
+
+  it('derives the Worker name from a workers.dev host', () => {
+    expect(cloudflareWorkerUrl('https://my-app.acme.workers.dev')).toBe(
+      'https://dash.cloudflare.com/?to=/:account/workers/services/view/my-app/production',
+    );
+  });
+
+  it('falls back to the Workers list when the name cannot be known', () => {
+    const list = 'https://dash.cloudflare.com/?to=/:account/workers-and-pages';
+    // A custom domain carries no hint of the Worker's name.
+    expect(cloudflareWorkerUrl('https://app.example.com')).toBe(list);
+    expect(cloudflareWorkerUrl('not a url')).toBe(list);
+    expect(cloudflareWorkerUrl(null)).toBeNull();
+  });
+
+  it('points at the agent chat page of the matching Manyfold console', () => {
+    expect(manyfoldAgentUrl('https://manyfold.ai', 'agt_1')).toBe(
+      'https://manyfold.ai/agents/agt_1/chat',
+    );
+    expect(manyfoldAgentUrl('https://manyfold.ai', null)).toBeNull();
   });
 });

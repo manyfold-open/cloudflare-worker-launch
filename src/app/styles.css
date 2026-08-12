@@ -297,7 +297,18 @@ select:focus-visible,
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: space-between;
+  /* Not space-between: once the links wrap to a second row it spreads that row apart too,
+     leaving holes between buttons that belong together. */
+  justify-content: flex-start;
+}
+.toolbar-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* Stays at the far end of the first row, and is the one control that is not a link out. */
+.toolbar-end {
+  margin-left: auto;
 }
 
 .agent-picker {

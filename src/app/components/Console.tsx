@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ProjectStatus, ProjectView } from '../../shared/types';
+import { cloudflareWorkerUrl, githubRepoUrl, manyfoldAgentUrl } from '../../shared/links';
 import { api, del } from '../api';
 import { streamTurn } from '../sse';
 
@@ -21,14 +22,19 @@ interface HistoryResponse {
 export default function Console(props: { project: ProjectView; webBaseUrl: string }) {
   const { project } = props;
   /**
-   * The same agent, on Manyfold's own console. Worth a door of its own: that view has the
-   * terminal, the file browser and the run history, which this chat box deliberately does
-   * not — and when a turn goes wrong, that is where you find out why.
+   * The four places a launch lives. Short labels: they sit in one row, and a wrapped
+   * toolbar reads worse than a slightly terser link.
+   *
+   * Manyfold earns its own door because that console has the terminal, the file browser
+   * and the run history this chat box deliberately does not — when a turn goes wrong, that
+   * is where you find out why.
    */
-  const manyfoldChatUrl =
-    props.webBaseUrl && project.agentId
-      ? `${props.webBaseUrl}/agents/${encodeURIComponent(project.agentId)}/chat`
-      : null;
+  const links = [
+    { href: project.workerUrl, label: 'Open app ↗' },
+    { href: githubRepoUrl(project.repoFullName), label: 'GitHub ↗' },
+    { href: cloudflareWorkerUrl(project.workerUrl), label: 'Cloudflare ↗' },
+    { href: manyfoldAgentUrl(props.webBaseUrl, project.agentId), label: 'Manyfold ↗' },
+  ].filter((link): link is { href: string; label: string } => Boolean(link.href));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [live, setLive] = useState<{ status: string; text: string } | null>(null);
@@ -110,17 +116,24 @@ export default function Console(props: { project: ProjectView; webBaseUrl: strin
                 : `app down — ${status.detail ?? 'unknown'}`}
           </span>
         )}
-        {project.workerUrl && (
-          <a className="button subtle" href={project.workerUrl} target="_blank" rel="noreferrer">
-            Open app ↗
-          </a>
-        )}
-        {manyfoldChatUrl && (
-          <a className="button subtle" href={manyfoldChatUrl} target="_blank" rel="noreferrer">
-            Open in Manyfold ↗
-          </a>
-        )}
-        <button className="button subtle" onClick={() => void reset()} disabled={!messages.length || !!live}>
+        <div className="toolbar-links">
+          {links.map((link) => (
+            <a
+              key={link.label}
+              className="button subtle"
+              href={link.href}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+        <button
+          className="button subtle toolbar-end"
+          onClick={() => void reset()}
+          disabled={!messages.length || !!live}
+        >
           Reset
         </button>
       </div>
