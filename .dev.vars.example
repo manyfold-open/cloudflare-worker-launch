@@ -1,11 +1,15 @@
 # Local development variables. Copy to .dev.vars (git-ignored) and adjust.
 #
-# Point at staging while developing: creating agents and minting tokens on production
-# would touch real accounts.
+# Which Manyfold environment validates the token you paste in step 2. Tokens are not
+# shared between environments, so this must match where you created yours. Staging by
+# default: on production, setup creates real agents and turns are really billed.
 MANYFOLD_API_BASE_URL=https://api-staging.manyfold.ai
 
-# "production" turns on https-only and no-private-IP validation for agent and app URLs.
-# Leave it unset (or "development") locally so http://localhost targets are accepted.
+# Independent of the line above — it only hardens URL validation (https-only, no private
+# or loopback addresses). Running the full production configuration locally works fine;
+# the one thing it forbids is registering an http://localhost app URL in step 1, so use
+# it when your app is really deployed, or when you front a local one with a tunnel:
+#   npx cloudflared tunnel --url http://localhost:5173
 ENVIRONMENT=development
 
 # REQUIRED in any deployment that more than one person uses: this app stores other

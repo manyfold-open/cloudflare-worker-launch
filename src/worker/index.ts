@@ -37,7 +37,13 @@ import { HttpError, type Env } from './types';
 import { ensureSchema } from './db';
 import { ConfigError } from './crypto';
 import { A2AError, fetchTimeout, safeErrorText, validateA2AUrl } from './a2a';
-import { ManyfoldError, manyfoldEnvironment, toHttpError, type Framework } from './manyfold';
+import {
+  ManyfoldClient,
+  ManyfoldError,
+  manyfoldEnvironment,
+  toHttpError,
+  type Framework,
+} from './manyfold';
 import {
   connectAccount,
   createSession,
@@ -50,6 +56,7 @@ import {
   requireTenant,
   sessionCookie,
   type SessionRow,
+  type Tenant,
 } from './session';
 import {
   createProject,
@@ -169,6 +176,42 @@ const tenantOf = (c: { get: (key: 'session') => SessionRow | null }) => requireT
 const accountOf = (c: { get: (key: 'session') => SessionRow | null }) =>
   requireBoundTenant(c.get('session'));
 
+/**
+ * Runs one management-plane call, and treats a credential the platform rejects as spent.
+ *
+ * Without this the wizard is a dead end: step 2 only appears while the session is
+ * unauthorized, so once a stored token stops working — wrong environment, revoked,
+ * expired — every later step fails with "api token not found" and there is no way left to
+ * paste a new one. Dropping the token here flips `hasManagementToken` to false, which is
+ * what brings the authorize step back.
+ */
+async function withManagement<T>(
+  env: Env,
+  tenant: Tenant,
+  fn: (client: ManyfoldClient) => Promise<T>,
+): Promise<T> {
+  const client = await requireManagementClient(env, tenant);
+  try {
+    return await fn(client);
+  } catch (error) {
+    // Both shapes reach here: a raw platform error, and one the callee already mapped.
+    const rejected =
+      (error instanceof ManyfoldError && error.isAuth) ||
+      (error instanceof HttpError &&
+        error.status === 401 &&
+        error.code === 'manyfold_unauthorized');
+    if (!rejected) throw error;
+
+    await discardManagementToken(env, tenant.userId);
+    const { apiHost } = manyfoldEnvironment(env.MANYFOLD_API_BASE_URL);
+    throw new HttpError(
+      401,
+      'token_invalid',
+      `${apiHost} no longer accepts the stored account token. Paste a token for ${apiHost} to carry on — tokens are not shared between Manyfold environments.`,
+    );
+  }
+}
+
 async function readJson<T>(c: { req: { json: () => Promise<unknown> } }): Promise<T> {
   const body = await c.req.json().catch(() => null);
   if (!body || typeof body !== 'object') {
@@ -273,13 +316,11 @@ app.post('/api/projects/:id/worker', async (c) => {
 app.get('/api/projects/:id/agent-options', async (c) => {
   const tenant = accountOf(c);
   await requireProject(c.env, tenant.userId, c.req.param('id'));
-  const client = await requireManagementClient(c.env, tenant);
-  return c.json(await agentOptions(client));
+  return c.json(await withManagement(c.env, tenant, (client) => agentOptions(client)));
 });
 
 app.post('/api/projects/:id/agent', async (c) => {
   const tenant = accountOf(c);
-  const client = await requireManagementClient(c.env, tenant);
   const body = await readJson<{
     mode?: unknown;
     name?: unknown;
@@ -300,17 +341,20 @@ app.post('/api/projects/:id/agent', async (c) => {
           apiKey: typeof body.apiKey === 'string' ? body.apiKey : undefined,
         } as const);
 
-  const project = await provisionAgent(c.env, client, tenant.userId, c.req.param('id'), input);
+  const project = await withManagement(c.env, tenant, (client) =>
+    provisionAgent(c.env, client, tenant.userId, c.req.param('id'), input),
+  );
   return c.json({ project: toView(project) });
 });
 
 app.get('/api/projects/:id/connections', async (c) => {
   const tenant = accountOf(c);
   await requireProject(c.env, tenant.userId, c.req.param('id'));
-  const client = await requireManagementClient(c.env, tenant);
-  const connections = await client.listConnections().catch((error) => {
-    throw toHttpError(error, 'Could not list your connections');
-  });
+  const connections = await withManagement(c.env, tenant, (client) =>
+    client.listConnections().catch((error) => {
+      throw toHttpError(error, 'Could not list your connections');
+    }),
+  );
   return c.json({
     connections: connections
       .filter((connection) => connection.provider === 'github')
@@ -326,10 +370,11 @@ app.get('/api/projects/:id/connections', async (c) => {
 app.post('/api/projects/:id/github/start', async (c) => {
   const tenant = accountOf(c);
   await requireProject(c.env, tenant.userId, c.req.param('id'));
-  const client = await requireManagementClient(c.env, tenant);
-  const started = await client.startGithubInstall().catch((error) => {
-    throw toHttpError(error, 'Could not start the GitHub App install');
-  });
+  const started = await withManagement(c.env, tenant, (client) =>
+    client.startGithubInstall().catch((error) => {
+      throw toHttpError(error, 'Could not start the GitHub App install');
+    }),
+  );
   const url = started.url ?? started.installUrl ?? null;
   if (!url) {
     throw new HttpError(
@@ -346,21 +391,23 @@ app.get('/api/projects/:id/repos', async (c) => {
   await requireProject(c.env, tenant.userId, c.req.param('id'));
   const connectionId = c.req.query('connectionId');
   if (!connectionId) throw new HttpError(400, 'bad_request', 'connectionId is required.');
-  const client = await requireManagementClient(c.env, tenant);
-  const result = await client.listGithubRepos(connectionId).catch((error) => {
-    throw toHttpError(error, 'Could not list repositories');
-  });
+  const result = await withManagement(c.env, tenant, (client) =>
+    client.listGithubRepos(connectionId).catch((error) => {
+      throw toHttpError(error, 'Could not list repositories');
+    }),
+  );
   return c.json({ repos: result.repos ?? [] });
 });
 
 app.post('/api/projects/:id/repo', async (c) => {
   const tenant = accountOf(c);
-  const client = await requireManagementClient(c.env, tenant);
   const body = await readJson<{ connectionId?: unknown; repoFullName?: unknown }>(c);
-  const project = await linkRepository(c.env, client, tenant.userId, c.req.param('id'), {
-    connectionId: str(body.connectionId, 'connectionId'),
-    repoFullName: str(body.repoFullName, 'repoFullName'),
-  });
+  const project = await withManagement(c.env, tenant, (client) =>
+    linkRepository(c.env, client, tenant.userId, c.req.param('id'), {
+      connectionId: str(body.connectionId, 'connectionId'),
+      repoFullName: str(body.repoFullName, 'repoFullName'),
+    }),
+  );
   return c.json({ project: toView(project) });
 });
 

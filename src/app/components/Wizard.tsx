@@ -17,7 +17,7 @@ import type {
   RepoView,
   SetupState,
 } from '../../shared/types';
-import { ApiError, api, post } from '../api';
+import { ApiError, api, del, post } from '../api';
 import { streamTurn } from '../sse';
 
 const STEPS: { key: SetupState; label: string }[] = [
@@ -33,20 +33,29 @@ const stepIndex = (state: SetupState): number => {
   return found === -1 ? STEPS.length : found;
 };
 
-function useAsyncAction() {
+/**
+ * `onAuthLost` is what keeps a dead credential from becoming a dead end: any 401 from a
+ * step means the stored account token is gone or rejected, and the shell needs to re-read
+ * state so it can route back to the authorize step.
+ */
+function useAsyncAction(onAuthLost?: () => Promise<void>) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const run = useCallback(async (action: () => Promise<void>) => {
-    setBusy(true);
-    setError('');
-    try {
-      await action();
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const run = useCallback(
+    async (action: () => Promise<void>) => {
+      setBusy(true);
+      setError('');
+      try {
+        await action();
+      } catch (cause) {
+        setError(cause instanceof ApiError ? cause.message : String(cause));
+        if (cause instanceof ApiError && cause.status === 401) await onAuthLost?.();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onAuthLost],
+  );
   return { busy, error, setError, run };
 }
 
@@ -118,6 +127,8 @@ function AuthStep(props: {
   scopes: string[];
   apiHost: string;
   tokenPageUrl: string;
+  /** True when we held a token and the platform stopped accepting it. */
+  recovering: boolean;
   onDone: () => Promise<void>;
 }) {
   const [token, setToken] = useState('');
@@ -126,10 +137,19 @@ function AuthStep(props: {
   return (
     <section className="panel">
       <h2>2 · Authorize your Manyfold account</h2>
-      <p className="muted">
-        Create an API token with exactly these scopes and paste it below. We use it only to
-        set the agent up, and you can have us forget it the moment setup is done.
-      </p>
+      {props.recovering ? (
+        <div className="notice warn">
+          The account token this app held is no longer accepted by <code>{props.apiHost}</code>.
+          The usual cause is a token from a different Manyfold environment; it can also be a
+          token that was revoked or has expired. Paste a current one to carry on — the rest of
+          your setup is untouched.
+        </div>
+      ) : (
+        <p className="muted">
+          Create an API token with exactly these scopes and paste it below. We use it only to
+          set the agent up, and you can have us forget it the moment setup is done.
+        </p>
+      )}
 
       {/* Named up front because tokens are per-environment: pasting a token from a
           different Manyfold environment fails with a flat "api token not found", which
@@ -192,7 +212,11 @@ function AuthStep(props: {
 
 /* ───────── step 3: agent ───────── */
 
-function AgentStep(props: { project: ProjectView; onDone: (project: ProjectView) => void }) {
+function AgentStep(props: {
+  project: ProjectView;
+  refresh: () => Promise<void>;
+  onDone: (project: ProjectView) => void;
+}) {
   const [options, setOptions] = useState<{
     agents: AgentOptionView[];
     providers: ProviderOptionView[];
@@ -201,7 +225,7 @@ function AgentStep(props: { project: ProjectView; onDone: (project: ProjectView)
   const [name, setName] = useState('my-app-agent');
   const [providerId, setProviderId] = useState('');
   const [adoptId, setAdoptId] = useState('');
-  const { busy, error, setError, run } = useAsyncAction();
+  const { busy, error, setError, run } = useAsyncAction(props.refresh);
 
   useEffect(() => {
     api<{ agents: AgentOptionView[]; providers: ProviderOptionView[] }>(
@@ -213,8 +237,12 @@ function AgentStep(props: { project: ProjectView; onDone: (project: ProjectView)
         setAdoptId(result.agents.find((agent) => agent.eligible)?.agentId ?? '');
         if (result.providers.length === 0) setMode('adopt');
       })
-      .catch((cause) => setError(cause instanceof ApiError ? cause.message : String(cause)));
-  }, [props.project.id, setError]);
+      .catch((cause) => {
+        setError(cause instanceof ApiError ? cause.message : String(cause));
+        // The very first call of the step is exactly where a stale token surfaces.
+        if (cause instanceof ApiError && cause.status === 401) void props.refresh();
+      });
+  }, [props.project.id, props.refresh, setError]);
 
   const provider = options?.providers.find((entry) => entry.providerId === providerId) ?? null;
 
@@ -312,12 +340,16 @@ function AgentStep(props: { project: ProjectView; onDone: (project: ProjectView)
 
 /* ───────── step 4: github ───────── */
 
-function GithubStep(props: { project: ProjectView; onDone: (project: ProjectView) => void }) {
+function GithubStep(props: {
+  project: ProjectView;
+  refresh: () => Promise<void>;
+  onDone: (project: ProjectView) => void;
+}) {
   const [connections, setConnections] = useState<ConnectionView[] | null>(null);
   const [connectionId, setConnectionId] = useState('');
   const [repos, setRepos] = useState<RepoView[] | null>(null);
   const [repo, setRepo] = useState('');
-  const { busy, error, setError, run } = useAsyncAction();
+  const { busy, error, setError, run } = useAsyncAction(props.refresh);
 
   const loadConnections = useCallback(async () => {
     const result = await api<{ connections: ConnectionView[] }>(
@@ -328,10 +360,11 @@ function GithubStep(props: { project: ProjectView; onDone: (project: ProjectView
   }, [props.project.id]);
 
   useEffect(() => {
-    loadConnections().catch((cause) =>
-      setError(cause instanceof ApiError ? cause.message : String(cause)),
-    );
-  }, [loadConnections, setError]);
+    loadConnections().catch((cause) => {
+      setError(cause instanceof ApiError ? cause.message : String(cause));
+      if (cause instanceof ApiError && cause.status === 401) void props.refresh();
+    });
+  }, [loadConnections, props.refresh, setError]);
 
   useEffect(() => {
     if (!connectionId) return;
@@ -490,6 +523,8 @@ function BootstrapStep(props: { project: ProjectView; onDone: () => Promise<void
 export default function Wizard(props: {
   project: ProjectView;
   connected: boolean;
+  /** Do we still hold a token the platform accepts? */
+  hasManagementToken: boolean;
   scopes: string[];
   apiHost: string;
   tokenPageUrl: string;
@@ -497,12 +532,20 @@ export default function Wizard(props: {
   refresh: () => Promise<void>;
   onProject: (project: ProjectView) => void;
 }) {
-  // The server owns progress, with one exception: a project can be past step 1 while the
-  // session has no account bound (a token was discarded, or this is a new browser), and
-  // in that case authorization is what we actually need next.
+  // The server owns progress, with one exception: every step after the first needs a usable
+  // account token, and we can be past step 1 without one — a new browser, a token we
+  // dropped after setup, or one the platform has stopped accepting. In all three cases
+  // authorization is what is actually needed next, whatever the stored setupState says.
+  const needsAuth = !props.connected || !props.hasManagementToken;
   const effective: SetupState =
-    !props.connected && props.project.setupState !== 'deploy' ? 'auth' : props.project.setupState;
+    needsAuth && props.project.setupState !== 'deploy' ? 'auth' : props.project.setupState;
   const current = stepIndex(effective);
+
+  // Swapping accounts, or recovering by hand: drop our copy, which lands on the step above.
+  const reauthorize = async () => {
+    await del('/api/account');
+    await props.refresh();
+  };
 
   return (
     <div className="wizard">
@@ -530,13 +573,28 @@ export default function Wizard(props: {
           scopes={props.scopes}
           apiHost={props.apiHost}
           tokenPageUrl={props.tokenPageUrl}
+          recovering={props.connected}
           onDone={props.refresh}
         />
       )}
-      {effective === 'agent' && <AgentStep project={props.project} onDone={props.onProject} />}
-      {effective === 'github' && <GithubStep project={props.project} onDone={props.onProject} />}
+      {effective === 'agent' && (
+        <AgentStep project={props.project} refresh={props.refresh} onDone={props.onProject} />
+      )}
+      {effective === 'github' && (
+        <GithubStep project={props.project} refresh={props.refresh} onDone={props.onProject} />
+      )}
       {effective === 'bootstrap' && (
         <BootstrapStep project={props.project} onDone={props.refresh} />
+      )}
+
+      {props.connected && props.hasManagementToken && effective !== 'deploy' && (
+        <p className="hint">
+          Wrong account, or wrong Manyfold environment?{' '}
+          <button className="link" onClick={() => void reauthorize()}>
+            Use a different token
+          </button>
+          .
+        </p>
       )}
     </div>
   );

@@ -128,6 +128,7 @@ export default function App() {
         <Wizard
           project={active}
           connected={state.connected}
+          hasManagementToken={state.hasManagementToken}
           scopes={state.requiredScopes}
           apiHost={state.apiHost}
           tokenPageUrl={state.tokenPageUrl}
