@@ -184,11 +184,11 @@ describe('chooseModel', () => {
 
 describe('manyfoldEnvironment', () => {
   it('pairs each API host with the web console that owns its tokens', () => {
-    expect(manyfoldEnvironment('https://api.manyfold.ai')).toEqual({
+    expect(manyfoldEnvironment('https://api.manyfold.ai')).toMatchObject({
       apiHost: 'api.manyfold.ai',
       tokenPageUrl: 'https://manyfold.ai/settings/api-tokens',
     });
-    expect(manyfoldEnvironment('https://api-staging.manyfold.ai')).toEqual({
+    expect(manyfoldEnvironment('https://api-staging.manyfold.ai')).toMatchObject({
       apiHost: 'api-staging.manyfold.ai',
       tokenPageUrl: 'https://app-staging.manyfold.ai/settings/api-tokens',
     });
@@ -198,6 +198,15 @@ describe('manyfoldEnvironment', () => {
     expect(manyfoldEnvironment(undefined).apiHost).toBe('api.manyfold.ai');
     expect(manyfoldEnvironment('https://api-staging.manyfold.ai/').apiHost).toBe(
       'api-staging.manyfold.ai',
+    );
+  });
+});
+
+describe('manyfoldEnvironment web base', () => {
+  it('gives the console root each environment deep-links into', () => {
+    expect(manyfoldEnvironment('https://api.manyfold.ai').webBaseUrl).toBe('https://manyfold.ai');
+    expect(manyfoldEnvironment('https://api-staging.manyfold.ai').webBaseUrl).toBe(
+      'https://app-staging.manyfold.ai',
     );
   });
 });

@@ -107,6 +107,20 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_id, id);
+
+-- Whether the launcher created a project's agent or adopted one the user already had.
+-- Deleting a project may offer to delete the agent too, and that offer must never appear
+-- for an agent we did not make.
+--
+-- A side table rather than a column on projects: SCHEMA runs as one batch on every cold
+-- start, and SQLite has no ALTER TABLE ... ADD COLUMN IF NOT EXISTS, so adding a column
+-- would throw on the second start of any database that already exists.
+CREATE TABLE IF NOT EXISTS project_agents (
+  project_id  TEXT PRIMARY KEY,
+  agent_id    TEXT NOT NULL,
+  created_by_us INTEGER NOT NULL,
+  created_at  TEXT NOT NULL
+);
 `;
 
 /**

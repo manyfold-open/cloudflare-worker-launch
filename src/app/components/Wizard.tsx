@@ -356,8 +356,42 @@ function GithubStep(props: {
       `/api/projects/${props.project.id}/connections`,
     );
     setConnections(result.connections);
-    setConnectionId((current) => current || result.connections[0]?.id || '');
+    // Prefer a newly added account: after installing on a second org, that is the one the
+    // user went to get, and re-selecting it by hand every time would be busywork.
+    setConnectionId((current) =>
+      current && result.connections.some((entry) => entry.id === current)
+        ? current
+        : (result.connections[result.connections.length - 1]?.id ?? ''),
+    );
   }, [props.project.id]);
+
+  const loadRepos = useCallback(
+    async (id: string) => {
+      setRepos(null);
+      const result = await api<{ repos: RepoView[] }>(
+        `/api/projects/${props.project.id}/repos?connectionId=${encodeURIComponent(id)}`,
+      );
+      setRepos(result.repos);
+      setRepo((current) =>
+        current && result.repos.some((entry) => entry.fullName === current)
+          ? current
+          : (result.repos[0]?.fullName ?? ''),
+      );
+    },
+    [props.project.id],
+  );
+
+  /** Re-reads both lists — what the user needs after granting access in the popup. */
+  const refreshLists = useCallback(async () => {
+    setError('');
+    try {
+      await loadConnections();
+      if (connectionId) await loadRepos(connectionId);
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : String(cause));
+      if (cause instanceof ApiError && cause.status === 401) await props.refresh();
+    }
+  }, [connectionId, loadConnections, loadRepos, props, setError]);
 
   useEffect(() => {
     loadConnections().catch((cause) => {
@@ -368,16 +402,12 @@ function GithubStep(props: {
 
   useEffect(() => {
     if (!connectionId) return;
-    setRepos(null);
-    api<{ repos: RepoView[] }>(
-      `/api/projects/${props.project.id}/repos?connectionId=${encodeURIComponent(connectionId)}`,
-    )
-      .then((result) => {
-        setRepos(result.repos);
-        setRepo((current) => current || result.repos[0]?.fullName || '');
-      })
-      .catch((cause) => setError(cause instanceof ApiError ? cause.message : String(cause)));
-  }, [connectionId, props.project.id, setError]);
+    loadRepos(connectionId).catch((cause) =>
+      setError(cause instanceof ApiError ? cause.message : String(cause)),
+    );
+  }, [connectionId, loadRepos, setError]);
+
+  const selected = connections?.find((entry) => entry.id === connectionId) ?? null;
 
   return (
     <section className="panel">
@@ -388,30 +418,7 @@ function GithubStep(props: {
       </p>
 
       {connections?.length === 0 && (
-        <>
-          <p>No GitHub connection on your account yet.</p>
-          <button
-            className="button"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const result = await post<{ url: string }>(
-                  `/api/projects/${props.project.id}/github/start`,
-                );
-                window.open(result.url, '_blank', 'noopener,noreferrer');
-              })
-            }
-          >
-            Install the GitHub App ↗
-          </button>
-          <p className="hint">
-            Make sure the app can see the repository the Deploy button created. Come back and{' '}
-            <button className="link" onClick={() => void loadConnections()}>
-              refresh
-            </button>
-            .
-          </p>
-        </>
+        <p>No GitHub connection on your account yet — add one below.</p>
       )}
 
       {connections && connections.length > 0 && (
@@ -442,14 +449,51 @@ function GithubStep(props: {
               ))}
             </select>
           </label>
-          {repos?.length === 0 && (
-            <p className="hint">
-              This connection cannot see any repositories. Widen the GitHub App’s access, then
-              reselect it.
-            </p>
-          )}
+
+          {/* Two different "my repo isn't here" problems, and they have different fixes:
+              the installation exists but cannot see this repo, or the repo lives under an
+              account this Manyfold account has never connected. Offer both, always —
+              hiding them once a connection exists is what left people stuck. */}
+          <p className="hint">
+            {repos?.length === 0
+              ? `“${selected?.displayName ?? 'This connection'}” cannot see any repositories yet.`
+              : 'Repository not in the list?'}{' '}
+            {selected?.manageUrl && (
+              <>
+                <a href={selected.manageUrl} target="_blank" rel="noreferrer">
+                  Adjust which repos {selected.displayName} shares ↗
+                </a>
+                {', or '}
+              </>
+            )}
+            add another account below.
+          </p>
         </>
       )}
+
+      <div className="row">
+        <button
+          className="button"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              const result = await post<{ url: string }>(
+                `/api/projects/${props.project.id}/github/start`,
+              );
+              window.open(result.url, '_blank', 'noopener,noreferrer');
+            })
+          }
+        >
+          {connections?.length ? 'Connect another account or org ↗' : 'Install the GitHub App ↗'}
+        </button>
+        <button className="button subtle" disabled={busy} onClick={() => void refreshLists()}>
+          Refresh
+        </button>
+      </div>
+      <p className="hint">
+        Grant access to the repository the Deploy button created, then come back and refresh.
+        Installing on an organization needs an owner to approve it.
+      </p>
 
       {error && <div className="notice error">{error}</div>}
 

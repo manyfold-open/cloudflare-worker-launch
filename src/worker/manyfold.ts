@@ -308,20 +308,25 @@ export class ManyfoldClient {
  * that reads like a bad paste when it is really a wrong host. Showing the host in the
  * wizard, and naming it in that error, makes the mismatch self-evident.
  */
-export function manyfoldEnvironment(baseUrl?: string): { apiHost: string; tokenPageUrl: string } {
+export function manyfoldEnvironment(baseUrl?: string): {
+  apiHost: string;
+  tokenPageUrl: string;
+  webBaseUrl: string;
+} {
   const raw = (baseUrl ?? DEFAULT_BASE_URL).trim().replace(/\/+$/, '');
   let apiHost: string;
   try {
     apiHost = new URL(raw).host;
   } catch {
-    return { apiHost: raw, tokenPageUrl: '' };
+    return { apiHost: raw, tokenPageUrl: '', webBaseUrl: '' };
   }
   // The web console paired with this API host: api.manyfold.ai → manyfold.ai,
   // api-staging.manyfold.ai → app-staging.manyfold.ai.
   const webHost = apiHost.startsWith('api-')
     ? apiHost.replace(/^api-([a-z0-9]+)\./, 'app-$1.')
     : apiHost.replace(/^api\./, '');
-  return { apiHost, tokenPageUrl: `https://${webHost}/settings/api-tokens` };
+  const webBaseUrl = `https://${webHost}`;
+  return { apiHost, tokenPageUrl: `${webBaseUrl}/settings/api-tokens`, webBaseUrl };
 }
 
 /** Maps a platform error onto the HTTP status this app should answer with. */

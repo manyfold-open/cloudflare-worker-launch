@@ -18,8 +18,17 @@ interface HistoryResponse {
   messages: ChatMessage[];
 }
 
-export default function Console(props: { project: ProjectView }) {
+export default function Console(props: { project: ProjectView; webBaseUrl: string }) {
   const { project } = props;
+  /**
+   * The same agent, on Manyfold's own console. Worth a door of its own: that view has the
+   * terminal, the file browser and the run history, which this chat box deliberately does
+   * not — and when a turn goes wrong, that is where you find out why.
+   */
+  const manyfoldChatUrl =
+    props.webBaseUrl && project.agentId
+      ? `${props.webBaseUrl}/agents/${encodeURIComponent(project.agentId)}/chat`
+      : null;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [live, setLive] = useState<{ status: string; text: string } | null>(null);
@@ -104,6 +113,11 @@ export default function Console(props: { project: ProjectView }) {
         {project.workerUrl && (
           <a className="button subtle" href={project.workerUrl} target="_blank" rel="noreferrer">
             Open app ↗
+          </a>
+        )}
+        {manyfoldChatUrl && (
+          <a className="button subtle" href={manyfoldChatUrl} target="_blank" rel="noreferrer">
+            Open in Manyfold ↗
           </a>
         )}
         <button className="button subtle" onClick={() => void reset()} disabled={!messages.length || !!live}>

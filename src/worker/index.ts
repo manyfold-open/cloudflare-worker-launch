@@ -7,7 +7,8 @@
  *   POST   /api/account                         session  paste an account token, bind the session
  *   DELETE /api/account                         account  drop our copy of that token
  *   POST   /api/projects                        tenant   start a project
- *   DELETE /api/projects/:id                    tenant   forget a project (never deletes the agent)
+ *   GET    /api/projects/:id/deletion           tenant   what deleting this project would remove
+ *   DELETE /api/projects/:id                    tenant   delete it, and clean up what setup made
  *   POST   /api/projects/:id/worker             tenant   record + health-check the deployed URL
  *   GET    /api/projects/:id/agent-options      account  agents to adopt, providers to create with
  *   POST   /api/projects/:id/agent              account  provision (create or adopt) the agent
@@ -59,8 +60,8 @@ import {
   type Tenant,
 } from './session';
 import {
+  agentWasCreatedByUs,
   createProject,
-  deleteProject,
   listProjects,
   requireProject,
   toView,
@@ -72,6 +73,7 @@ import {
   completeBootstrap,
   linkRepository,
   provisionAgent,
+  teardownProject,
 } from './setup';
 import { getConversation, handleChatTurn, resetConversation } from './chat';
 
@@ -276,13 +278,33 @@ app.post('/api/projects', async (c) => {
   return c.json({ project: toView(project) }, 201);
 });
 
+/**
+ * Deletes a project, and cleans up what setup created on the user's behalf.
+ *
+ * `?deleteAgent=true` additionally deletes the agent — honoured only for an agent this app
+ * created, never for one that was adopted. Works without a management token too: the local
+ * record always goes, and the report names anything that had to be left behind.
+ */
 app.delete('/api/projects/:id', async (c) => {
   const tenant = tenantOf(c);
-  await requireProject(c.env, tenant.userId, c.req.param('id'));
-  await deleteProject(c.env, tenant.userId, c.req.param('id'));
+  const project = await requireProject(c.env, tenant.userId, c.req.param('id'));
+  const deleteAgent = c.req.query('deleteAgent') === 'true';
+  const client = tenant.bound ? await managementClient(c.env, tenant.userId) : null;
+
+  const report = await teardownProject(c.env, client, tenant.userId, project, { deleteAgent });
+  return c.json({ ok: true, ...report });
+});
+
+/** What a delete would do, so the confirmation can be specific rather than generic. */
+app.get('/api/projects/:id/deletion', async (c) => {
+  const tenant = tenantOf(c);
+  const project = await requireProject(c.env, tenant.userId, c.req.param('id'));
   return c.json({
-    ok: true,
-    note: 'The project is gone from this app. The agent and its repository are untouched on Manyfold and GitHub.',
+    agentName: project.agent_name,
+    /** Only then may the UI offer to delete the agent. */
+    agentCreatedByUs: project.agent_id ? await agentWasCreatedByUs(c.env, project.id) : false,
+    hasCredential: Boolean(project.chat_token_ct),
+    repoFullName: project.repo_full_name,
   });
 });
 

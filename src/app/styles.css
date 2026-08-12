@@ -622,3 +622,28 @@ code {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Delete dialog: a checkbox with a paragraph of consequence next to it, and the
+   list of what did or did not happen afterwards. */
+.checkline {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 14px 0;
+  font-size: 14px;
+}
+.checkline input {
+  margin-top: 3px;
+}
+.report-list {
+  margin: 10px 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.report-list li {
+  margin: 4px 0;
+}
+.dialog h3 {
+  margin: 0 0 10px;
+}

@@ -11,6 +11,7 @@ import type { AppState, ProjectView } from '../shared/types';
 import { api, del, post } from './api';
 import Wizard from './components/Wizard';
 import Console from './components/Console';
+import DeleteProject from './components/DeleteProject';
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
@@ -73,6 +74,11 @@ export default function App() {
       current ? { ...current, projects: [result.project, ...current.projects] } : current,
     );
     setActiveId(result.project.id);
+  };
+
+  const afterDelete = async () => {
+    setActiveId(null);
+    await refreshState();
   };
 
   const forgetToken = async () => {
@@ -138,7 +144,16 @@ export default function App() {
         />
       )}
 
-      {active && active.setupState === 'done' && <Console project={active} />}
+      {active && active.setupState === 'done' && (
+        <Console project={active} webBaseUrl={state.webBaseUrl} />
+      )}
+
+      {active && (
+        <p className="hint footer-note">
+          Done with this launch?{' '}
+          <DeleteProject project={active} onDeleted={afterDelete} />
+        </p>
+      )}
 
       {state.connected && state.hasManagementToken && active?.setupState === 'done' && (
         <p className="hint footer-note">

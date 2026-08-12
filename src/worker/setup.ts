@@ -27,6 +27,9 @@ import {
 } from './manyfold';
 import { probeAgentAuth } from './a2a';
 import {
+  agentWasCreatedByUs,
+  deleteProject,
+  rememberAgentOrigin,
   requireProject,
   storeChatCredential,
   updateProject,
@@ -225,6 +228,8 @@ export async function provisionAgent(
       },
     );
 
+    await rememberAgentOrigin(env, project.id, agent.id, created);
+
     return updateProject(env, userId, updated.id, {
       agent_id: agent.id,
       agent_name: agent.name,
@@ -302,6 +307,85 @@ export function bootstrapPrompt(project: ProjectRow): string {
     'For any FAILED item, include the raw error output. Do not fix anything yet, do not',
     'change any file, and do not push. This is a readiness check only.',
   ].join('\n');
+}
+
+export interface TeardownReport {
+  /** Human-readable lines describing what actually happened, in order. */
+  did: string[];
+  /** Things the user still has to do themselves, if any. */
+  leftBehind: string[];
+}
+
+/**
+ * Undoes what setup created, as far as this app is allowed to.
+ *
+ * Three rules shape this:
+ *
+ *   1. **The caller token is always revoked when we can.** We minted it, it is a live
+ *      credential to the user's agent, and leaving it behind after the project is gone
+ *      would be a credential nobody can see and nobody remembers to remove.
+ *   2. **The agent is deleted only when we created it, and only when asked.** Deleting an
+ *      agent the user already owned would destroy work that predates this app.
+ *   3. **Everything is best-effort, and the report says what really happened.** A revoke
+ *      that fails must not block the local delete, but it also must not be silent — the
+ *      user has to know a credential is still live.
+ *
+ * Never touched: the GitHub connection (it is the account's, not the project's), the
+ * repository, and the deployed Cloudflare app.
+ */
+export async function teardownProject(
+  env: Env,
+  client: ManyfoldClient | null,
+  userId: string,
+  project: ProjectRow,
+  options: { deleteAgent: boolean },
+): Promise<TeardownReport> {
+  const did: string[] = [];
+  const leftBehind: string[] = [];
+  const agentLabel = project.agent_name ?? project.agent_id ?? 'the agent';
+
+  const ours = await agentWasCreatedByUs(env, project.id);
+  const wantsAgentGone = options.deleteAgent && ours && Boolean(project.agent_id);
+
+  if (options.deleteAgent && !ours && project.agent_id) {
+    leftBehind.push(`${agentLabel} was already on your account before this project, so it was left alone.`);
+  }
+
+  if (!client && (project.chat_token_id || wantsAgentGone)) {
+    leftBehind.push(
+      'This app no longer holds your Manyfold account token, so it could not revoke the agent credential it minted. Remove it from the agent\u2019s A2A callers list in Manyfold.',
+    );
+  }
+
+  if (client && project.agent_id && project.chat_token_id && !wantsAgentGone) {
+    // Skipped when the agent is going away anyway: deleting an agent takes its grants with it.
+    try {
+      await client.revokeCallerToken(project.agent_id, project.chat_token_id);
+      did.push(`Revoked the agent credential this app minted for ${agentLabel}.`);
+    } catch {
+      leftBehind.push(
+        `Could not revoke the credential for ${agentLabel} \u2014 remove it from that agent\u2019s A2A callers list in Manyfold.`,
+      );
+    }
+  }
+
+  if (client && wantsAgentGone && project.agent_id) {
+    try {
+      await client.deleteAgent(project.agent_id);
+      did.push(`Deleted ${agentLabel} on Manyfold, along with its skills and A2A grants.`);
+    } catch {
+      leftBehind.push(`Could not delete ${agentLabel} on Manyfold \u2014 delete it there if you want it gone.`);
+    }
+  }
+
+  await deleteProject(env, userId, project.id);
+  did.push('Removed the project from this app, including its chat history.');
+
+  if (project.repo_full_name) {
+    leftBehind.push(`${project.repo_full_name} and its Cloudflare deployment are untouched.`);
+  }
+
+  return { did, leftBehind };
 }
 
 /** Marks setup finished and records what the agent reported. */

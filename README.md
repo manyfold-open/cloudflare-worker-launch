@@ -64,6 +64,17 @@ generate-a-key-into-D1 fallback is not good enough here:
 npx wrangler secret put CONFIG_ENCRYPTION_KEY
 ```
 
+## Cleaning up
+
+Every launch has a **Delete** button. It always removes the project and its chat history
+from this app, and revokes the agent credential this app minted — that credential is live
+until someone revokes it, so leaving it behind would be worse than the tidy-up.
+
+Deleting the **agent** is offered only when this app created it. An agent you already owned
+and adopted is never deleted, even if the request asks for it. Your repository and your
+Cloudflare deployment are never touched by either path, and the dialog says afterwards what
+actually happened, including anything it could not do.
+
 ## Troubleshooting
 
 **"api token not found" when you paste your token.** Almost always the wrong environment,

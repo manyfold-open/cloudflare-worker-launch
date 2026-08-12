@@ -78,6 +78,8 @@ export interface AppState {
   apiHost: string;
   /** Where to create a token for that specific environment. */
   tokenPageUrl: string;
+  /** Root of the matching Manyfold web console, for deep links to an agent. */
+  webBaseUrl: string;
   /** Where the user creates that token. */
   templateRepoUrl: string;
   deployButtonUrl: string;

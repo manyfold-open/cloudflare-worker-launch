@@ -123,6 +123,34 @@ export async function updateProject(
   return requireProject(env, userId, projectId);
 }
 
+/** Records how this project got its agent, so cleanup knows what it is allowed to delete. */
+export async function rememberAgentOrigin(
+  env: Env,
+  projectId: string,
+  agentId: string,
+  createdByUs: boolean,
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO project_agents (project_id, agent_id, created_by_us, created_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (project_id) DO UPDATE SET
+       agent_id = excluded.agent_id,
+       created_by_us = excluded.created_by_us`,
+  )
+    .bind(projectId, agentId, createdByUs ? 1 : 0, now())
+    .run();
+}
+
+/** True only for an agent this app created — never for one the user already owned. */
+export async function agentWasCreatedByUs(env: Env, projectId: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    'SELECT created_by_us FROM project_agents WHERE project_id = ?',
+  )
+    .bind(projectId)
+    .first<{ created_by_us: number }>();
+  return row?.created_by_us === 1;
+}
+
 export async function deleteProject(env: Env, userId: string, projectId: string): Promise<void> {
   const conversation = await env.DB.prepare('SELECT id FROM conversations WHERE project_id = ?')
     .bind(projectId)
@@ -131,6 +159,7 @@ export async function deleteProject(env: Env, userId: string, projectId: string)
     await env.DB.prepare('DELETE FROM messages WHERE conversation_id = ?').bind(conversation.id).run();
     await env.DB.prepare('DELETE FROM conversations WHERE id = ?').bind(conversation.id).run();
   }
+  await env.DB.prepare('DELETE FROM project_agents WHERE project_id = ?').bind(projectId).run();
   await env.DB.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?')
     .bind(projectId, userId)
     .run();
