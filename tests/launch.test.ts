@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { asSetupState, toView, type ProjectRow } from '../src/worker/projects';
-import { bootstrapPrompt } from '../src/worker/setup';
+import { bootstrapPrompt, chooseModel } from '../src/worker/setup';
 import { FRAMEWORK_PROTOCOL, pickProvider, providerModels, type ModelProvider } from '../src/worker/manyfold';
 import {
   readSessionCookie,
@@ -152,5 +152,26 @@ describe('bootstrapPrompt', () => {
 
   it('degrades honestly when the deployment URL is unknown', () => {
     expect(bootstrapPrompt(row({ worker_url: null }))).toContain('has not shared the URL');
+  });
+});
+
+describe('chooseModel', () => {
+  it('takes the preferred model when the provider offers it', () => {
+    expect(chooseModel('codex', ['gpt-5.5', 'gpt-5.6-luna'])).toBe('gpt-5.6-luna');
+    expect(chooseModel('claude-code', ['claude-haiku-4-5', 'claude-opus-4-6'])).toBe(
+      'claude-opus-4-6',
+    );
+  });
+
+  it('never falls back to a model that cannot write code', () => {
+    // The provider list is alphabetical, so the naive first-element fallback would pick
+    // the audio model and the agent would fail confusingly.
+    expect(chooseModel('codex', ['gpt-4o-audio-preview', 'gpt-image-2', 'gpt-9-future'])).toBe(
+      'gpt-9-future',
+    );
+  });
+
+  it('returns null when the provider advertises nothing', () => {
+    expect(chooseModel('codex', [])).toBeNull();
   });
 });

@@ -238,6 +238,27 @@ export class ManyfoldClient {
     return this.request<void>('DELETE', `/agents/${encodeURIComponent(agentId)}`);
   }
 
+  /**
+   * Copies a skill from a public GitHub URL into the account's own skill library.
+   *
+   * This step is not optional plumbing: `/skills/install` only accepts skills the platform
+   * already knows — a catalog entry or a library id — so installing straight from a GitHub
+   * path 404s with "discoverable skill … not found". Import first, install second.
+   *
+   * `onConflict: 'overwrite'` makes a re-run cheap and keeps the library from filling up
+   * with copies as the skill is revised upstream. The key is camelCase — a snake_case
+   * `on_conflict` is silently ignored, and the second import then 409s on the name.
+   */
+  importSkillFromGithub(url: string): Promise<{ skill: { id: string } }> {
+    return this.request(
+      'POST',
+      '/skills/library/import',
+      { url, onConflict: 'overwrite' },
+      PROVISION_TIMEOUT_MS,
+    );
+  }
+
+  /** `skillId` is a library id (`skl_…`) or a catalog id — not a raw GitHub path. */
   installSkill(agentId: string, skillId: string): Promise<{ id: string }> {
     return this.request('POST', '/skills/install', { skillId, agentId }, PROVISION_TIMEOUT_MS);
   }

@@ -33,9 +33,14 @@ import {
   type ProjectRow,
 } from './projects';
 
-/** The harness skill that teaches the agent this template's engineering conventions. */
-const HARNESS_SKILL_ID =
-  'github:manyfold-open/manyfold-launch@main:skills/cf-starter-dev';
+/**
+ * The harness skill that teaches the agent this template's engineering conventions.
+ *
+ * A GitHub URL rather than a `github:owner/repo@ref:path` id, because installing needs the
+ * skill to exist in the account's library first — see `installHarnessSkill`.
+ */
+const HARNESS_SKILL_URL =
+  'https://github.com/manyfold-open/manyfold-launch/tree/main/skills/cf-starter-dev';
 
 /** Conversation credentials are rotated rather than renewed; 90 days is one product cycle. */
 const CALLER_TOKEN_DAYS = 90;
@@ -46,8 +51,15 @@ const CALLER_NAME = 'Manyfold Launch';
 const MODEL_PREFERENCE: Record<Framework, string[]> = {
   codex: ['gpt-5.6-luna', 'gpt-5.6', 'gpt-5.5'],
   'claude-code': ['claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-haiku-4-5'],
-  'gemini-cli': [],
+  'gemini-cli': ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-3.5-flash'],
 };
+
+/**
+ * Models that cannot drive a coding agent. The provider list is alphabetical, so without
+ * this the fallback below would hand someone `gpt-4o-audio-preview` and the agent would
+ * fail in a thoroughly confusing way.
+ */
+const NON_TEXT_MODEL = /(image|audio|realtime|tts|whisper|embed)/i;
 
 export interface AgentOption {
   agentId: string;
@@ -117,7 +129,9 @@ export function chooseModel(framework: Framework, models: string[]): string | nu
   for (const preferred of MODEL_PREFERENCE[framework]) {
     if (models.includes(preferred)) return preferred;
   }
-  return models[0] ?? null;
+  // Unknown provider or a newer catalogue than this list knows about: take the first model
+  // that could plausibly write code rather than the first one alphabetically.
+  return models.find((model) => !NON_TEXT_MODEL.test(model)) ?? models[0] ?? null;
 }
 
 /**
@@ -186,7 +200,7 @@ export async function provisionAgent(
 
     // Best-effort: a missing harness skill degrades the agent's judgement about this
     // template but does not stop it from working, and the bootstrap turn reports it.
-    await client.installSkill(agent.id, HARNESS_SKILL_ID).catch(() => undefined);
+    await installHarnessSkill(client, agent.id);
 
     await client.setExposure(agent.id, true);
     const caller = await client.mintCallerToken(agent.id, CALLER_NAME, CALLER_TOKEN_DAYS);
@@ -221,6 +235,24 @@ export async function provisionAgent(
       await client.deleteAgent(agent.id).catch(() => undefined);
     }
     throw error instanceof HttpError ? error : toHttpError(error, 'Could not finish agent setup');
+  }
+}
+
+/**
+ * Puts the harness skill on the agent: import into the account's library, then install the
+ * resulting library id.
+ *
+ * Deliberately swallows failures. The agent still works without the skill — it just has to
+ * rediscover this template's conventions from `AGENTS.md` — and taking the whole setup down
+ * over a skill that the readiness check will report on anyway would be the wrong trade.
+ */
+async function installHarnessSkill(client: ManyfoldClient, agentId: string): Promise<void> {
+  try {
+    const imported = await client.importSkillFromGithub(HARNESS_SKILL_URL);
+    const skillId = imported?.skill?.id;
+    if (skillId) await client.installSkill(agentId, skillId);
+  } catch {
+    /* see the note above: not fatal */
   }
 }
 
